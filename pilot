@@ -7,31 +7,53 @@ from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils import to_categorical
 
-data_dir = 'path_to_dataset_directory'
-classes = ['normal', 'fracture', 'osteoarthritis']
-num_classes = len(classes)
-input_size = (128, 128)  # Resize images to a suitable input size
+#load and preprocess the dataset
+data_dir = r'C:\Users\\radiographs'
 
-def preprocess_data(data_dir, input_size):
+input_size = (128, 128)
+
+
+classes = [
+    'no_fracture_left', 'no_fracture_right',
+    'peritrochanteric_right', 'peritrochanteric_left',
+    'subcapital_left', 'subcapital_right'
+]
+num_classes = len(classes)
+
+def preprocess_data(data_dir, input_size, classes):
     X, y = [], []
     for i, cls in enumerate(classes):
         class_dir = os.path.join(data_dir, cls)
         for img_name in os.listdir(class_dir):
             img_path = os.path.join(class_dir, img_name)
-            img = cv2.imread(img_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-            img = cv2.resize(img, input_size)
-            X.append(img)
-            y.append(i)
-    X = np.array(X) / 255.0  # Normalize pixel values between 0 and 1
+            print(img_path)  # Add this line to check the image paths
+            try:
+                img = cv2.imread(img_path)
+                if img is not None:
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    img = cv2.resize(img, input_size)
+                    X.append(img)
+                    y.append(i)
+                else:
+                    print(f"Warning: Image {img_path} could not be loaded. Skipping...")
+            except Exception as e:
+                print(f"Error occurred while processing {img_path}: {e}")
+
+    X = np.array(X) / 255.0
     y = to_categorical(y, num_classes)
     return X, y
 
-X, y = preprocess_data(data_dir, input_size)
+# Call preprocess_data and check the return
+X, y = preprocess_data(data_dir, input_size, classes)
+print(f"Number of loaded X-rays: {len(X)}")
+print(f"Number of corresponding labels: {len(y)}")
 
-from sklearn.model_selection import train_test_split
+#split the data between training and testing sets
+from sklearn.model_selection import train_test_split 
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+#build the CNN model
 
 model = Sequential()
 model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(input_size[0], input_size[1], 3)))
@@ -40,13 +62,15 @@ model.add(Conv2D(64, (3, 3), activation='relu'))
 model.add(MaxPooling2D((2, 2)))
 model.add(Flatten())
 model.add(Dense(128, activation='relu'))
-model.add(Dense(num_classes, activation='softmax'))
+model.add(Dense(num_classes, activation='softmax'))  # Change this line to have 6 units
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
+#train the model
 epochs = 10
 batch_size = 16
 
 history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.1)
 
+#evaluate the model
 loss, accuracy = model.evaluate(X_test, y_test)
 print(f'Test loss: {loss:.4f}, Test accuracy: {accuracy:.4f}')
